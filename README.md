@@ -1,70 +1,150 @@
-# Getting Started with Create React App
+# 얼굴 인식 앱
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+이 React 애플리케이션은 `face-api.js` 라이브러리를 사용하여 웹캠을 통해 실시간으로 얼굴, 얼굴 랜드마크 및 표정을 인식합니다.
 
-## Available Scripts
+## 주요 기능
 
-In the project directory, you can run:
+- 실시간 얼굴 인식
+- 얼굴 랜드마크(눈, 코, 입 등) 인식
+- 얼굴 표정(행복, 슬픔, 화남 등) 인식
+- 비디오 피드에 인식 결과 오버레이
 
-### `npm start`
+## 필요 사항
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- Node.js
+- npm (Node 패키지 관리자)
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 설치 방법
 
-### `npm test`
+1. **저장소 클론**:
+   ```bash
+   git clone https://github.com/yourusername/facedetection-app.git
+   cd facedetection-app
+   ```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+2. **종속성 설치**:
+   ```bash
+   npm install
+   ```
 
-### `npm run build`
+3. **face-api.js 모델 다운로드**:
+   - 다음 모델들을 다운로드하여 `public/models` 디렉터리에 넣습니다:
+     - `tiny_face_detector_model`
+     - `face_landmark_68_model`
+     - `face_recognition_model`
+     - `face_expression_model`
+   - [face-api.js 모델 저장소](https://github.com/justadudewhohacks/face-api.js/tree/master/weights)에서 모델들을 다운로드할 수 있습니다.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## 애플리케이션 실행
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+1. **개발 서버 시작**:
+   ```bash
+   npm start
+   ```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+2. 브라우저를 열고 `http://localhost:3000`에 접속합니다.
 
-### `npm run eject`
+## 사용 방법
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+1. "시작" 버튼을 클릭하여 웹캠을 시작합니다.
+2. 애플리케이션이 자동으로 얼굴, 랜드마크 및 표정을 실시간으로 인식하고 비디오 피드에 결과를 오버레이합니다.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## 코드 설명
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### 필요한 라이브러리 가져오기
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```javascript
+import React, { useEffect, useRef } from "react";
+import * as faceapi from "face-api.js";
+```
+- `React`: 메인 React 라이브러리
+- `useEffect` 및 `useRef`: React 훅
 
-## Learn More
+### App 컴포넌트
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```javascript
+function App() {
+  const videoRef = useRef(); // 비디오 요소를 참조하기 위한 useRef 훅
+  const canvasRef = useRef(); // 캔버스 요소를 참조하기 위한 useRef 훅
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+  useEffect(() => {
+    const loadModels = async () => {
+      const MODEL_URL = "/models"; // 모델이 위치한 URL 설정
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+      ]);
+    };
+    loadModels(); // 모델 로드 함수 호출
+  }, []);
 
-### Code Splitting
+  const startVideo = () => {
+    navigator.getUserMedia(
+      { video: {} },
+      (stream) => (videoRef.current.srcObject = stream),
+      (err) => console.error(err)
+    );
+  };
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+  const handleVideoPlay = () => {
+    const canvas = faceapi.createCanvasFromMedia(videoRef.current);
+    canvasRef.current.appendChild(canvas);
 
-### Analyzing the Bundle Size
+    const displaySize = {
+      width: videoRef.current.width,
+      height: videoRef.current.height,
+    };
+    faceapi.matchDimensions(canvas, displaySize);
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+    setInterval(async () => {
+      const detections = await faceapi
+        .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceExpressions();
 
-### Making a Progressive Web App
+      const resizedDetections = faceapi.resizeResults(detections, displaySize);
+      canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+      faceapi.draw.drawDetections(canvas, resizedDetections);
+      faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+      faceapi.draw.drawFaceExpressions(canvas, resizedDetections);
+    }, 100);
+  };
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+  return (
+    <div>
+      <video
+        ref={videoRef}
+        width="720"
+        height="560"
+        autoPlay
+        muted
+        onPlay={handleVideoPlay}
+      />
+      <div ref={canvasRef} style={{ position: "absolute", top: 0, left: 0 }} />
+      <button onClick={startVideo}>시작</button>
+    </div>
+  );
+}
 
-### Advanced Configuration
+export default App;
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### 주요 개념
 
-### Deployment
+1. **React 및 훅 (Hooks)**:
+   - `useEffect`: 컴포넌트가 마운트될 때 또는 업데이트될 때 실행되는 부수효과를 처리합니다.
+   - `useRef`: DOM 요소를 직접 참조하기 위해 사용되는 React 훅입니다.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+2. **face-api.js**:
+   - 얼굴 인식, 랜드마크 검출, 표정 인식을 위한 JavaScript 라이브러리입니다.
+   - `loadFromUri`: 주어진 URL에서 모델을 로드합니다.
+   - `detectAllFaces`: 비디오 또는 이미지에서 얼굴을 감지합니다.
+   - `withFaceLandmarks`, `withFaceExpressions`: 얼굴 랜드마크 및 표정을 검출하는 메서드입니다.
+   - `resizeResults`: 감지된 결과를 주어진 크기에 맞게 조정합니다.
+   - `draw.drawDetections`, `draw.drawFaceLandmarks`, `draw.drawFaceExpressions`: 감지된 얼굴, 랜드마크, 표정을 캔버스에 그립니다.
 
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+3. **getUserMedia**:
+   - 웹 브라우저에서 사용자의 카메라와 같은 미디어 장치에 접근할 수 있게 해주는 API입니다.
+   - `navigator.getUserMedia`: 웹캠 스트림을 가져오는 메서드로, 성공 시 비디오 요소의 `srcObject`에 스트림을 설정합니다.
