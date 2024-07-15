@@ -1,5 +1,8 @@
 # 얼굴 인식 앱
 
+![image](https://github.com/user-attachments/assets/8bbdfde2-b23f-4634-9517-89790232869c)
+
+
 이 React 애플리케이션은 `face-api.js` 라이브러리를 사용하여 웹캠을 통해 실시간으로 얼굴, 얼굴 랜드마크 및 표정을 인식합니다.
 
 ## 주요 기능
