@@ -21,8 +21,8 @@
 
 1. **저장소 클론**:
    ```bash
-   git clone https://github.com/yourusername/facedetection-app.git
-   cd facedetection-app
+   git clone https://github.com/JAEKWANG97/react-face-api.git
+   cd react-face-api
    ```
 
 2. **종속성 설치**:
